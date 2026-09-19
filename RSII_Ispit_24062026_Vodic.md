@@ -2,7 +2,9 @@
 
 > **Cilj ovog dokumenta:** Da razumiješ *logiku* rješavanja RSII ispita, a ne da kopiraš gotov kod.
 > **Pravilo:** Prvo čitaj, razumij, zatim sama piši. Koristi postojeće primjere u templateu kao „udžbenik", ne kao rješenje.
-> **Ovaj vodič NAMJERNO ne sadrži gotovo rješenje ispita.** Daje ti način razmišljanja, mapu projekta i redoslijed rada.
+> **PUNI KODOVI ZA SVAKI KORAK (cijeli fajlovi):** [RSII_Ispit_24062026_Kompletni_Kodovi.md](RSII_Ispit_24062026_Kompletni_Kodovi.md)
+>
+> U tom fajlu uradi Replace All: `IBXXXXXX` → tvoj indeks, pa prepisuj korak 1, 2, 3...
 
 ---
 
@@ -39,6 +41,7 @@
 29. [Cheat Sheet](#29-cheat-sheet)
 30. [Rječnik pojmova](#30-rječnik-pojmova)
 31. [KODOVI koje pišeš na ispitu](#31-kodovi-koje-pišeš-na-ispitu)
+32. [Kompletni fajlovi – poseban dokument](#32-kompletni-fajlovi--poseban-dokument)
 
 ---
 
@@ -5218,6 +5221,18 @@ card.InitialBalance -= total; // POGREŠNO — stanje se računa
 ```
 Commands/CreatePaymentCard/  // TO JE RS1, NE RSII
 ```
+
+---
+
+# 32. Kompletni fajlovi – poseban dokument
+
+Ako želiš **cijeli sadržaj svakog fajla**, bez „dodaj ovu liniju", otvori:
+
+**[RSII_Ispit_24062026_Kompletni_Kodovi.md](RSII_Ispit_24062026_Kompletni_Kodovi.md)**
+
+Tu je 28 koraka. Svaki korak = jedan cijeli fajl ili jedna komanda.
+
+Prvo u tom fajlu: Replace All `IBXXXXXX` → tvoj indeks.
 
 ---
 
