@@ -38,6 +38,7 @@
 28. [Mini primjeri za vježbu](#28-mini-primjeri-za-vježbu)
 29. [Cheat Sheet](#29-cheat-sheet)
 30. [Rječnik pojmova](#30-rječnik-pojmova)
+31. [KODOVI koje pišeš na ispitu](#31-kodovi-koje-pišeš-na-ispitu)
 
 ---
 
@@ -3854,6 +3855,1369 @@ Ako nisi sigurna, dodaj samo što tekst traži + Id + CreatedAt. To je dovoljno.
 7. U tabeli kartica početno i dalje 200.
 
 Ako nemaš proizvode od tačno 50: uzmi bilo koje iznose, ali **sama izračunaj** očekivano. Profesorov primjer je za razumijevanje; tvoj test mora poštovati istu formulu.
+
+---
+
+# 31. KODOVI koje pišeš na ispitu
+
+Ovo je sekcija zbog koje možeš sjesti za Visual Studio i **znati šta kucati**.
+
+Pravila čitanja:
+
+* `IBXXXXXX` **uvijek** zamijeni svojim indeksom, npr. `IB210001`.
+* Kod je kalup u **istom stilu** kao template. Nije čarolija — to je Category/Order/Review, samo druga imena.
+* Gdje piše `// DODAJ`, to je jedna linija u **postojećem** fajlu.
+* Gdje piše cijeli fajl, praviš **novi** fajl desnim klikom → Add → Class / New File.
+* Nemoj mijenjati `BaseCRUDService.cs`. On već radi Insert/Update/Delete.
+
+Prije pisanja otvori u Visual Studiju **pored** svog novog fajla:
+
+* Entity: `Database/Category.cs` i `Database/ProductReview.cs`
+* Servis: `CategoryService.cs` i `ProductReviewService.cs`
+* Checkout: `OrderService.cs`
+
+---
+
+## 31.1. Imena koja moraš uskladiti
+
+Ako ti je indeks `IB210001`, onda:
+
+| Šta | Ime |
+|-----|-----|
+| Entity klasa | `PaymentCardIB210001` |
+| Tabela / DbSet | `PaymentCardsIB210001` |
+| Insert request | `PaymentCardIB210001InsertRequest` |
+| Update request | `PaymentCardIB210001UpdateRequest` |
+| Response | `PaymentCardIB210001Response` |
+| Search | `PaymentCardIB210001Search` |
+| Validator insert | `PaymentCardIB210001InsertValidator` |
+| Validator update | `PaymentCardIB210001UpdateValidator` |
+| Interface | `IPaymentCardIB210001Service` |
+| Servis | `PaymentCardIB210001Service` |
+| Controller | `PaymentCardIB210001Controller` |
+| Ruta | `/PaymentCardIB210001` |
+| Flutter endpoint | `PaymentCardIB210001` |
+| FK na Order | `PaymentCardIB210001Id` |
+
+U kalupima ispod ostavljam `IBXXXXXX`. **Find & Replace** prije ispita u glavi: XXXXXX → tvoj broj.
+
+---
+
+## 31.2. Connection string (postojeći fajl)
+
+Fajl: `eCommerce.WebAPI/appsettings.Development.json`
+
+**Šta već piše** (lokalni Docker):
+
+```json
+"ConnectionStrings": {
+  "DefaultConnection": "Server=localhost,1435;Database=eCommerce;User Id=sa;Password=qweasd123!;TrustServerCertificate=True;"
+}
+```
+
+**Šta ti napišeš na ispitu** (svoj indeks, ne IB150051):
+
+```json
+"ConnectionStrings": {
+  "DefaultConnection": "Server=192.168.0.1\\Exams,1999;Database=IBXXXXXX;User Id=john;Password=doe2025;TrustServerCertificate=True;"
+}
+```
+
+PMC (Default project = `eCommerce.Services`):
+
+```
+Update-Database
+```
+
+Poslije tvoje nove tabele:
+
+```
+Add-Migration AddPaymentCardsIBXXXXXX
+Update-Database
+```
+
+---
+
+## 31.3. NOVI fajl: Entity kartice
+
+Desni klik na folder `eCommerce.Services/Database` → Add → Class.
+
+Ime fajla: `PaymentCardIBXXXXXX.cs`
+
+**Zašto ovako:** isti atributi kao `Product` (novac) i `ProductReview` (FK na User).
+
+```csharp
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace eCommerce.Services.Database
+{
+    public class PaymentCardIBXXXXXX
+    {
+        [Key]
+        public int Id { get; set; }
+
+        // veza na korisnika — „jedan korisnik više kartica"
+        public int UserId { get; set; }
+
+        [ForeignKey(nameof(UserId))]
+        public User User { get; set; } = null!;
+
+        // 12 cifara — string zbog vodećih nula i validacije
+        [Required]
+        [MaxLength(12)]
+        public string CardNumber { get; set; } = string.Empty;
+
+        [Required]
+        [MaxLength(3)]
+        public string Cvc { get; set; } = string.Empty;
+
+        // istek — DateTime je najlakše validirati sa UtcNow
+        [Required]
+        public DateTime ExpiryDate { get; set; }
+
+        [Required]
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal InitialBalance { get; set; }
+
+        // NEMA CurrentBalance — zadatak kaže da se računa
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? UpdatedAt { get; set; }
+
+        // narudžbe plaćene ovom karticom = transakcije
+        public ICollection<Order> Orders { get; set; } = new List<Order>();
+    }
+}
+```
+
+Ako želiš kraj mjeseca umjesto tačnog dana: i dalje koristi `DateTime`, npr. unesi `2027-06-30`. Na ispitu je važno da istekla kartica padne, ne ISO standard banaka.
+
+---
+
+## 31.4. DODAJ u postojeći `User.cs`
+
+Fajl: `eCommerce.Services/Database/User.cs`
+
+Na dno klase, pored ostalih `ICollection`:
+
+```csharp
+public ICollection<PaymentCardIBXXXXXX> PaymentCardsIBXXXXXX { get; set; }
+    = new List<PaymentCardIBXXXXXX>();
+```
+
+To je strana **1** u relaciji 1:N.
+
+---
+
+## 31.5. DODAJ u postojeći `Order.cs`
+
+Fajl: `eCommerce.Services/Database/Order.cs`
+
+Unutar klase `Order`, npr. ispod `PaymentDate`:
+
+```csharp
+// nullable jer stare narudžbe u seedu nemaju karticu
+public int? PaymentCardIBXXXXXXId { get; set; }
+
+[ForeignKey(nameof(PaymentCardIBXXXXXXId))]
+public PaymentCardIBXXXXXX? PaymentCardIBXXXXXX { get; set; }
+```
+
+Zašto `int?` a ne `int`: migracija neće puknuti na starim redovima.
+
+---
+
+## 31.6. DODAJ u postojeći `eCommerceConfiguration.cs`
+
+Fajl: `eCommerce.Services/Database/eCommerceConfiguration.cs`
+
+Unutar `CreateConfiguration`, kopiraj **isti oblik** kao ProductReview → Order:
+
+```csharp
+modelBuilder.Entity<PaymentCardIBXXXXXX>()
+    .HasOne(c => c.User)
+    .WithMany(u => u.PaymentCardsIBXXXXXX)
+    .HasForeignKey(c => c.UserId)
+    .OnDelete(DeleteBehavior.Cascade);
+
+modelBuilder.Entity<Order>()
+    .HasOne(o => o.PaymentCardIBXXXXXX)
+    .WithMany(c => c.Orders)
+    .HasForeignKey(o => o.PaymentCardIBXXXXXXId)
+    .OnDelete(DeleteBehavior.Restrict);
+```
+
+**Cascade** na kartice: ako se obriše user, idu i njegove kartice.
+
+**Restrict** na narudžbe: brisanje kartice ne smije obrisati historiju plaćanja.
+
+---
+
+## 31.7. DODAJ u postojeći `eCommerceDbContext.cs`
+
+Fajl: `eCommerce.Services/Database/eCommerceDbContext.cs`
+
+Pored ostalih `DbSet`:
+
+```csharp
+public DbSet<PaymentCardIBXXXXXX> PaymentCardsIBXXXXXX { get; set; }
+```
+
+Sada Build (Ctrl+Shift+B). Ako ima crvenih grešaka, ne radi migraciju.
+
+Zatim PMC:
+
+```
+Add-Migration AddPaymentCardsIBXXXXXX
+Update-Database
+```
+
+Otvori generisani fajl u `Migrations/` i provjeri da vidiš `CreateTable` i `AddColumn` na Orders.
+
+---
+
+## 31.8. NOVI DTO fajlovi u `eCommerce.Model`
+
+Kalup je `CategoriesInsertRequest` — **bez** `[Key]`, **bez** navigation objekata.
+
+### `Requests/PaymentCardIBXXXXXXInsertRequest.cs`
+
+```csharp
+namespace eCommerce.Model.Requests
+{
+    public class PaymentCardIBXXXXXXInsertRequest
+    {
+        public string CardNumber { get; set; } = string.Empty;
+        public string Cvc { get; set; } = string.Empty;
+        public DateTime ExpiryDate { get; set; }
+        public decimal InitialBalance { get; set; }
+        // UserId NE šaljemo iz forme — uzima se iz JWT-a u servisu
+    }
+}
+```
+
+### `Requests/PaymentCardIBXXXXXXUpdateRequest.cs`
+
+```csharp
+namespace eCommerce.Model.Requests
+{
+    public class PaymentCardIBXXXXXXUpdateRequest
+    {
+        public string CardNumber { get; set; } = string.Empty;
+        public string Cvc { get; set; } = string.Empty;
+        public DateTime ExpiryDate { get; set; }
+        public decimal InitialBalance { get; set; }
+    }
+}
+```
+
+### `Responses/PaymentCardIBXXXXXXResponse.cs`
+
+```csharp
+namespace eCommerce.Model.Responses
+{
+    public class PaymentCardIBXXXXXXResponse
+    {
+        public int Id { get; set; }
+        public int UserId { get; set; }
+        public string CardNumber { get; set; } = string.Empty;
+        public string Cvc { get; set; } = string.Empty;
+        public DateTime ExpiryDate { get; set; }
+        public decimal InitialBalance { get; set; }
+
+        // izračunato, NIJE kolona
+        public decimal AvailableBalance { get; set; }
+
+        public DateTime CreatedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
+
+        // za edit ekran: datum + iznos transakcija
+        public List<PaymentCardTransactionResponse> Transactions { get; set; } = new();
+    }
+
+    public class PaymentCardTransactionResponse
+    {
+        public DateTime Date { get; set; }
+        public decimal Amount { get; set; }
+    }
+}
+```
+
+`Transactions` i `AvailableBalance` Mapster **ne može** sam popuniti iz entiteta. Njih puniš u servisu (vidi 31.11). Lista na GetAll može ostati prazna — puni ih u GetById da lista bude brža.
+
+### `SearchObjects/PaymentCardIBXXXXXXSearch.cs`
+
+```csharp
+namespace eCommerce.Model.SearchObjects
+{
+    public class PaymentCardIBXXXXXXSearch : BaseSearchObject
+    {
+        public int? UserId { get; set; }
+    }
+}
+```
+
+**Mora** naslijediti `BaseSearchObject`. Bez toga se projekat ne kompajlira.
+
+---
+
+## 31.9. NOVI validatori
+
+Kalup: `CategoryInsertValidator` / `ProductReviewInsertValidator`.
+
+Fajl: `eCommerce.Services/Validators/PaymentCardIBXXXXXXInsertValidator.cs`
+
+```csharp
+using eCommerce.Model.Requests;
+using FluentValidation;
+
+namespace eCommerce.Services.Validators
+{
+    public class PaymentCardIBXXXXXXInsertValidator
+        : AbstractValidator<PaymentCardIBXXXXXXInsertRequest>
+    {
+        public PaymentCardIBXXXXXXInsertValidator()
+        {
+            RuleFor(x => x.CardNumber)
+                .NotEmpty().WithMessage("Card number is required.")
+                .Matches("^[0-9]{12}$")
+                .WithMessage("Card number must be exactly 12 digits.");
+
+            RuleFor(x => x.Cvc)
+                .NotEmpty().WithMessage("CVC is required.")
+                .Matches("^[0-9]{3}$")
+                .WithMessage("CVC must be exactly 3 digits.");
+
+            RuleFor(x => x.ExpiryDate)
+                .Must(d => d > DateTime.UtcNow)
+                .WithMessage("Card is expired.");
+
+            RuleFor(x => x.InitialBalance)
+                .GreaterThanOrEqualTo(0)
+                .WithMessage("Initial balance must be 0 or greater.");
+        }
+    }
+}
+```
+
+Šta znači regex:
+
+* `^` početak stringa
+* `[0-9]` samo cifre
+* `{12}` tačno 12
+* `$` kraj stringa
+
+Zato `"1234 5678 9012"` (razmak) **pada**, `"123"` **pada**, `"12ab"` **pada**.
+
+Update validator je **isti** `RuleFor` blok, samo:
+
+```csharp
+public class PaymentCardIBXXXXXXUpdateValidator
+    : AbstractValidator<PaymentCardIBXXXXXXUpdateRequest>
+```
+
+Možeš copy-paste insert validatora i zamijeniti ime klase i `T` u `AbstractValidator<...>`.
+
+---
+
+## 31.10. NOVI interface
+
+Fajl: `eCommerce.Services/IPaymentCardIBXXXXXXService.cs`
+
+Ovo je doslovno `ICategoryService` sa drugim tipovima:
+
+```csharp
+using eCommerce.Model.Requests;
+using eCommerce.Model.Responses;
+using eCommerce.Model.SearchObjects;
+
+namespace eCommerce.Services
+{
+    public interface IPaymentCardIBXXXXXXService
+        : IBaseCRUDService<
+            PaymentCardIBXXXXXXResponse,
+            PaymentCardIBXXXXXXSearch,
+            PaymentCardIBXXXXXXInsertRequest,
+            PaymentCardIBXXXXXXUpdateRequest>
+    {
+    }
+}
+```
+
+Prazno tijelo je OK. Insert/Update/Delete/Get dolaze iz `IBaseCRUDService`.
+
+---
+
+## 31.11. NOVI servis — ovo je fajl koji najviše pišeš rukom
+
+Fajl: `eCommerce.Services/PaymentCardIBXXXXXXService.cs`
+
+Dva kalupa spojena:
+
+* `CategoryService` = nasljeđivanje + `ApplyFilters`
+* `ProductReviewService` = `IAuthenticatedUserAccessor` da kartica pripada ulogovanom useru
+
+```csharp
+using eCommerce.Model.Exceptions;
+using eCommerce.Model.Requests;
+using eCommerce.Model.Responses;
+using eCommerce.Model.SearchObjects;
+using eCommerce.Services.Database;
+using FluentValidation;
+using MapsterMapper;
+using Microsoft.EntityFrameworkCore;
+
+namespace eCommerce.Services
+{
+    public class PaymentCardIBXXXXXXService
+        : BaseCRUDService<
+            PaymentCardIBXXXXXX,
+            PaymentCardIBXXXXXXResponse,
+            PaymentCardIBXXXXXXSearch,
+            PaymentCardIBXXXXXXInsertRequest,
+            PaymentCardIBXXXXXXUpdateRequest>,
+          IPaymentCardIBXXXXXXService
+    {
+        private readonly IAuthenticatedUserAccessor _userAccessor;
+
+        public PaymentCardIBXXXXXXService(
+            ECommerceDbContext dbContext,
+            IMapper mapper,
+            IValidator<PaymentCardIBXXXXXXInsertRequest> insertValidator,
+            IValidator<PaymentCardIBXXXXXXUpdateRequest> updateValidator,
+            IAuthenticatedUserAccessor userAccessor)
+            : base(dbContext, mapper, insertValidator, updateValidator)
+        {
+            _userAccessor = userAccessor;
+        }
+
+        private int RequireUserId()
+        {
+            return _userAccessor.GetUserId()
+                   ?? throw new InvalidOperationException("User id claim is missing.");
+        }
+
+        protected override IEnumerable<PaymentCardIBXXXXXX> ApplyFilters(
+            IEnumerable<PaymentCardIBXXXXXX> query,
+            PaymentCardIBXXXXXXSearch? search)
+        {
+            var userId = _userAccessor.GetUserId();
+            if (!userId.HasValue)
+            {
+                return Enumerable.Empty<PaymentCardIBXXXXXX>();
+            }
+
+            // samo moje kartice — NE vjeruj search.UserId sa klijenta
+            query = query.Where(c => c.UserId == userId.Value);
+            return query;
+        }
+
+        protected override PaymentCardIBXXXXXX MapInsertRequestToEntity(
+            PaymentCardIBXXXXXXInsertRequest request)
+        {
+            var entity = base.MapInsertRequestToEntity(request);
+            entity.UserId = RequireUserId();
+            return entity;
+        }
+
+        public override async Task<PaymentCardIBXXXXXXResponse> GetByIdAsync(int id)
+        {
+            var userId = RequireUserId();
+
+            var entity = await _dbContext.Set<PaymentCardIBXXXXXX>()
+                .AsNoTracking()
+                .Include(c => c.Orders)
+                .FirstOrDefaultAsync(c => c.Id == id && c.UserId == userId);
+
+            if (entity == null)
+            {
+                throw new KeyNotFoundException($"PaymentCard with id {id} not found.");
+            }
+
+            return ToResponse(entity);
+        }
+
+        public override async Task<PageResult<PaymentCardIBXXXXXXResponse>> GetAllAsync(
+            PaymentCardIBXXXXXXSearch? search = null)
+        {
+            search ??= new PaymentCardIBXXXXXXSearch();
+            if (search.PageSize == null || search.PageSize < 50)
+            {
+                search.PageSize = 50; // da na profilu ne nestanu kartice zbog default 10
+            }
+
+            var page = await base.GetAllAsync(search);
+
+            // base.GetAll ne računa AvailableBalance — dopuni
+            foreach (var item in page.Items)
+            {
+                item.AvailableBalance = await CalculateAvailableAsync(item.Id, item.InitialBalance);
+            }
+
+            return page;
+        }
+
+        public override async Task<PaymentCardIBXXXXXXResponse> UpdateAsync(
+            int id,
+            PaymentCardIBXXXXXXUpdateRequest request)
+        {
+            var userId = RequireUserId();
+            var entity = await _dbContext.Set<PaymentCardIBXXXXXX>().FindAsync(id);
+
+            if (entity == null || entity.UserId != userId)
+            {
+                throw new KeyNotFoundException($"PaymentCard with id {id} not found.");
+            }
+
+            // baza UpdateAsync bi našla i tuđu karticu po id — zato override
+            return await base.UpdateAsync(id, request);
+        }
+
+        private PaymentCardIBXXXXXXResponse ToResponse(PaymentCardIBXXXXXX entity)
+        {
+            var response = _mapper.Map<PaymentCardIBXXXXXXResponse>(entity);
+
+            var successful = entity.Orders
+                .Where(o => o.Status != OrderStatus.Cancelled)
+                .ToList();
+
+            response.AvailableBalance =
+                entity.InitialBalance - successful.Sum(o => o.TotalAmount);
+
+            response.Transactions = successful
+                .OrderByDescending(o => o.OrderDate)
+                .Select(o => new PaymentCardTransactionResponse
+                {
+                    Date = o.OrderDate,
+                    Amount = o.TotalAmount
+                })
+                .ToList();
+
+            return response;
+        }
+
+        private async Task<decimal> CalculateAvailableAsync(int cardId, decimal initial)
+        {
+            var spent = await _dbContext.Orders
+                .Where(o => o.PaymentCardIBXXXXXXId == cardId
+                            && o.Status != OrderStatus.Cancelled)
+                .SumAsync(o => (decimal?)o.TotalAmount) ?? 0;
+
+            return initial - spent;
+        }
+    }
+}
+```
+
+Zašto `SumAsync(o => (decimal?)o.TotalAmount) ?? 0`:
+
+Ako nema nijedne narudžbe, `Sum` na praznom skupu za `decimal` može baciti grešku. Nullable decimal + `?? 0` je siguran.
+
+`OrderStatus` je u istom namespaceu `eCommerce.Services.Database` kao `Order.cs`.
+
+Ako `GetAllAsync` override bude spor ili kompliciran na ispitu, radi **minimum**: `ApplyFilters` + `MapInsertRequestToEntity` + `GetByIdAsync` sa transakcijama. Listu na profilu možeš računati dostupno ili samo prikazati početno stanje + broj kartice. Formula **mora** živjeti u checkoutu.
+
+---
+
+## 31.12. DODAJ u postojeći `Program.cs`
+
+Fajl: `eCommerce.WebAPI/Program.cs`
+
+Nađi linije kao:
+
+```csharp
+builder.Services.AddScoped<ICategoryService, CategoryService>();
+builder.Services.AddScoped<IValidator<CategoriesInsertRequest>, CategoryInsertValidator>();
+```
+
+**Ispod njih dopiši:**
+
+```csharp
+builder.Services.AddScoped<IPaymentCardIBXXXXXXService, PaymentCardIBXXXXXXService>();
+builder.Services.AddScoped<IValidator<PaymentCardIBXXXXXXInsertRequest>, PaymentCardIBXXXXXXInsertValidator>();
+builder.Services.AddScoped<IValidator<PaymentCardIBXXXXXXUpdateRequest>, PaymentCardIBXXXXXXUpdateValidator>();
+```
+
+Using-i na vrhu fajla već imaju `eCommerce.Services`, `eCommerce.Model.Requests`, `FluentValidation`. Ako kompajler ne vidi validator, dodaj:
+
+```csharp
+using eCommerce.Services.Validators;
+```
+
+(taj using već postoji u 2025/26 `Program.cs`.)
+
+Mapster: `CardNumber` na requestu = `CardNumber` na entitetu = `CardNumber` na responseu. **Ne treba** `TypeAdapterConfig` ako su imena ista. `AvailableBalance` i `Transactions` ionako puniš ručno.
+
+---
+
+## 31.13. NOVI kontroler
+
+Fajl: `eCommerce.WebAPI/Controllers/PaymentCardIBXXXXXXController.cs`
+
+Kalup: `ProductReviewsController` (ima `[Authorize]`), ne `CategoriesController` (GetAll je AllowAnonymous — kartice nisu javne).
+
+```csharp
+using eCommerce.Model.Requests;
+using eCommerce.Model.Responses;
+using eCommerce.Model.SearchObjects;
+using eCommerce.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace eCommerce.WebAPI.Controllers;
+
+[Authorize]
+public class PaymentCardIBXXXXXXController
+    : BaseCRUDController<
+        PaymentCardIBXXXXXXResponse,
+        PaymentCardIBXXXXXXSearch,
+        PaymentCardIBXXXXXXInsertRequest,
+        PaymentCardIBXXXXXXUpdateRequest,
+        IPaymentCardIBXXXXXXService>
+{
+    public PaymentCardIBXXXXXXController(IPaymentCardIBXXXXXXService service)
+        : base(service)
+    {
+    }
+}
+```
+
+**Nema** `new ECommerceDbContext`. Nema LINQ. Prazan kontroler je tačan odgovor.
+
+Rute koje dobiješ besplatno:
+
+| HTTP | URL | Metoda u bazi |
+|------|-----|----------------|
+| GET | `/PaymentCardIBXXXXXX` | GetAll |
+| GET | `/PaymentCardIBXXXXXX/5` | GetById |
+| POST | `/PaymentCardIBXXXXXX` | Insert |
+| PUT | `/PaymentCardIBXXXXXX/5` | Update |
+| DELETE | `/PaymentCardIBXXXXXX/5` | Delete |
+
+Swagger body za POST (primjer):
+
+```json
+{
+  "cardNumber": "123456789012",
+  "cvc": "123",
+  "expiryDate": "2027-12-31T00:00:00Z",
+  "initialBalance": 200
+}
+```
+
+JSON koristi **camelCase**. Zato Flutter šalje `cardNumber`, ne `CardNumber`.
+
+---
+
+## 31.14. Checkout — proširi postojeće, ne pravi novi kontroler
+
+### DODAJ u `CheckoutRequest.cs`
+
+Fajl: `eCommerce.Model/Requests/CheckoutRequest.cs`
+
+```csharp
+public int PaymentCardIBXXXXXXId { get; set; }
+```
+
+cijeli fajl poslije izmjene izgleda ovako:
+
+```csharp
+namespace eCommerce.Model.Requests;
+
+public class CheckoutRequest
+{
+    public List<CheckoutLineRequest> Items { get; set; } = new();
+
+    public string? ShippingAddress { get; set; }
+    public string? ShippingCity { get; set; }
+    public string? ShippingState { get; set; }
+    public string? ShippingZipCode { get; set; }
+    public string? ShippingCountry { get; set; }
+
+    public int PaymentCardIBXXXXXXId { get; set; }
+}
+```
+
+### DODAJ u `OrderService.CheckoutAsync`
+
+Fajl: `eCommerce.Services/OrderService.cs`
+
+Metoda već postoji. **Ne briši** provjeru korpe i stocka. Ubaci karticu **prije** `Orders.Add`, a FK na `new Order { ... }`.
+
+Na vrh metode, odmah nakon `userId`:
+
+```csharp
+if (request.PaymentCardIBXXXXXXId <= 0)
+{
+    throw new ClinetException("Please select a payment card.");
+}
+
+var card = await _dbContext.Set<PaymentCardIBXXXXXX>()
+    .FirstOrDefaultAsync(c => c.Id == request.PaymentCardIBXXXXXXId && c.UserId == userId);
+
+if (card == null)
+{
+    throw new ClinetException("Payment card was not found.");
+}
+
+if (card.ExpiryDate <= DateTime.UtcNow)
+{
+    throw new ClinetException("The selected card is expired.");
+}
+```
+
+Unutar `new Order { ... }` dodaj property (pored `UserId`, `Status`, ...):
+
+```csharp
+PaymentCardIBXXXXXXId = card.Id,
+PaymentDate = DateTime.UtcNow,
+```
+
+**Nakon** što izračunaš `total` (u templateu je to `order.TotalAmount = total;` prije `Add`), a **prije** `Add`/`SaveChanges`:
+
+```csharp
+var spent = await _dbContext.Orders
+    .Where(o => o.PaymentCardIBXXXXXXId == card.Id
+                && o.Status != OrderStatus.Cancelled)
+    .SumAsync(o => (decimal?)o.TotalAmount) ?? 0;
+
+var available = card.InitialBalance - spent;
+
+if (available < total)
+{
+    throw new ClinetException(
+        $"Insufficient funds. Available: {available:0.00}, order: {total:0.00}.");
+}
+```
+
+Važno:
+
+* `card.InitialBalance` se **ne smanjuje**.
+* `ClinetException` (typo ime klase) → Flutter vidi poruku.
+* Ako staviš ovaj blok **prije** petlje proizvoda, `total` još nije izračunat. Zato ide **poslije** `order.TotalAmount = total`.
+
+Using na vrhu `OrderService.cs` već ima `eCommerce.Model.Exceptions` i `Microsoft.EntityFrameworkCore`.
+
+---
+
+## 31.15. Flutter model
+
+Folder: `eCommerce/UI/ecommerce_mobile/lib/models/`
+
+Novi fajl: `payment_card.dart`
+
+Kalup: `product_review.dart`
+
+```dart
+import 'package:json_annotation/json_annotation.dart';
+
+part 'payment_card.g.dart';
+
+@JsonSerializable()
+class PaymentCardTransaction {
+  final DateTime? date;
+  final double? amount;
+
+  PaymentCardTransaction({this.date, this.amount});
+
+  factory PaymentCardTransaction.fromJson(Map<String, dynamic> json) =>
+      _$PaymentCardTransactionFromJson(json);
+
+  Map<String, dynamic> toJson() => _$PaymentCardTransactionToJson(this);
+}
+
+@JsonSerializable()
+class PaymentCard {
+  final int? id;
+  final int? userId;
+  final String? cardNumber;
+  final String? cvc;
+  final DateTime? expiryDate;
+  final double? initialBalance;
+  final double? availableBalance;
+  final List<PaymentCardTransaction> transactions;
+
+  PaymentCard({
+    this.id,
+    this.userId,
+    this.cardNumber,
+    this.cvc,
+    this.expiryDate,
+    this.initialBalance,
+    this.availableBalance,
+    this.transactions = const [],
+  });
+
+  factory PaymentCard.fromJson(Map<String, dynamic> json) =>
+      _$PaymentCardFromJson(json);
+
+  Map<String, dynamic> toJson() => _$PaymentCardToJson(this);
+}
+```
+
+U terminalu, folder `ecommerce_mobile`:
+
+```
+dart run build_runner build --delete-conflicting-outputs
+```
+
+To kreira `payment_card.g.dart`. **Bez ovoga** `part 'payment_card.g.dart';` ne postoji i Flutter je crven.
+
+---
+
+## 31.16. Flutter provider
+
+Novi fajl: `lib/providers/payment_card_provider.dart`
+
+Kalup: `product_review_provider.dart`
+
+```dart
+import 'package:ecommerce_mobile/models/payment_card.dart';
+import 'package:ecommerce_mobile/providers/base_provider.dart';
+
+class PaymentCardProvider extends BaseProvider<PaymentCard> {
+  PaymentCardProvider() : super('PaymentCardIBXXXXXX');
+
+  @override
+  PaymentCard fromJson(data) =>
+      PaymentCard.fromJson(data as Map<String, dynamic>);
+}
+```
+
+String u `super(...)` mora biti **isto** kao ime kontrolera bez `Controller`.
+
+Get/insert/update već postoje u `BaseProvider`. Ne pišeš HTTP ručno za CRUD.
+
+---
+
+## 31.17. DODAJ provider u `main.dart`
+
+Fajl: `lib/main.dart`
+
+1. Import:
+
+```dart
+import 'package:ecommerce_mobile/providers/payment_card_provider.dart';
+```
+
+2. Unutar `MultiProvider(providers: [ ... ]` dodaj pored `OrderProvider`:
+
+```dart
+ChangeNotifierProvider(create: (_) => PaymentCardProvider()),
+```
+
+Ako ovo zaboraviš, ekran pukne: `Could not find the correct Provider<PaymentCardProvider>`.
+
+---
+
+## 31.18. DODAJ sekciju na `profile_screen.dart`
+
+Fajl: `lib/screens/profile_screen.dart`
+
+### Importi na vrh
+
+```dart
+import 'package:ecommerce_mobile/models/payment_card.dart';
+import 'package:ecommerce_mobile/providers/payment_card_provider.dart';
+import 'package:ecommerce_mobile/screens/payment_card_details.dart';
+```
+
+### State polja (pored `late User user`)
+
+```dart
+List<PaymentCard> _cards = [];
+```
+
+### U `initData()` nakon što učitaš usera
+
+```dart
+final cards = await context.read<PaymentCardProvider>().get(
+  filter: {'page': 1, 'pageSize': 50},
+);
+```
+
+pa u `setState`:
+
+```dart
+_cards = cards.items ?? [];
+```
+
+`get` vraća `SearchResult` sa `items` — to je `PageResult` sa backenda.
+
+### U `build`, unutar `Column` djece (npr. između `_buildProfileInfo()` i `_buildProfileMenu()`)
+
+```dart
+_buildMyCards(),
+```
+
+### Nove metode u `_ProfileScreenState`
+
+```dart
+Widget _buildMyCards() {
+  return Padding(
+    padding: const EdgeInsets.fromLTRB(26, 0, 26, 24),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Moje kartice',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            TextButton(
+              onPressed: () async {
+                final refresh = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const PaymentCardDetailsScreen(),
+                  ),
+                );
+                if (refresh == 'reload') {
+                  initData();
+                }
+              },
+              child: const Text('Dodaj karticu'),
+            ),
+          ],
+        ),
+        if (_cards.isEmpty)
+          const Text('Nemate sačuvanih kartica.')
+        else
+          ..._cards.map((card) {
+            return Card(
+              child: ListTile(
+                title: Text(card.cardNumber ?? ''),
+                subtitle: Text(
+                  'Istek: ${card.expiryDate ?? ''}   '
+                  'Početno: ${card.initialBalance ?? 0}',
+                ),
+                onTap: () async {
+                  final refresh = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => PaymentCardDetailsScreen(card: card),
+                    ),
+                  );
+                  if (refresh == 'reload') {
+                    initData();
+                  }
+                },
+              ),
+            );
+          }),
+      ],
+    ),
+  );
+}
+```
+
+Ovo je isti `refresh == 'reload'` obrazac koji profil već koristi za `ProfileSettingsScreen`.
+
+---
+
+## 31.19. NOVI ekran `payment_card_details.dart`
+
+Zadatak **imenuje** ovaj fajl. Mora se zvati tačno tako.
+
+Kalup: `add_review_screen.dart` (TextEditingController + Save + pop).
+
+Fajl: `lib/screens/payment_card_details.dart`
+
+```dart
+import 'package:ecommerce_mobile/models/payment_card.dart';
+import 'package:ecommerce_mobile/providers/payment_card_provider.dart';
+import 'package:ecommerce_mobile/utils/api_client_exception.dart';
+import 'package:ecommerce_mobile/utils/utils_widgets.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+class PaymentCardDetailsScreen extends StatefulWidget {
+  final PaymentCard? card;
+
+  const PaymentCardDetailsScreen({super.key, this.card});
+
+  @override
+  State<PaymentCardDetailsScreen> createState() =>
+      _PaymentCardDetailsScreenState();
+}
+
+class _PaymentCardDetailsScreenState extends State<PaymentCardDetailsScreen> {
+  final _number = TextEditingController();
+  final _cvc = TextEditingController();
+  final _expiry = TextEditingController(); // npr. 2027-12-31
+  final _balance = TextEditingController();
+  bool _saving = false;
+  PaymentCard? _loaded;
+
+  bool get _isEdit => widget.card?.id != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final c = widget.card;
+    if (c != null) {
+      _number.text = c.cardNumber ?? '';
+      _cvc.text = c.cvc ?? '';
+      _expiry.text = c.expiryDate?.toIso8601String().split('T').first ?? '';
+      _balance.text = c.initialBalance?.toString() ?? '';
+    }
+    if (_isEdit) {
+      _loadDetails();
+    }
+  }
+
+  Future<void> _loadDetails() async {
+    try {
+      final full = await context.read<PaymentCardProvider>().getById(
+        widget.card!.id!,
+      );
+      setState(() => _loaded = full);
+    } on Exception catch (e) {
+      if (mounted) alertBox(context, 'Error', e.toString());
+    }
+  }
+
+  @override
+  void dispose() {
+    _number.dispose();
+    _cvc.dispose();
+    _expiry.dispose();
+    _balance.dispose();
+    super.dispose();
+  }
+
+  String? _localError() {
+    if (!RegExp(r'^[0-9]{12}$').hasMatch(_number.text)) {
+      return 'Broj kartice mora imati tačno 12 cifara.';
+    }
+    if (!RegExp(r'^[0-9]{3}$').hasMatch(_cvc.text)) {
+      return 'CVC mora imati tačno 3 cifre.';
+    }
+    final expiry = DateTime.tryParse(_expiry.text);
+    if (expiry == null) {
+      return 'Unesi datum isteka (npr. 2027-12-31).';
+    }
+    if (!expiry.isAfter(DateTime.now())) {
+      return 'Kartica je istekla.';
+    }
+    final balance = double.tryParse(_balance.text.replaceAll(',', '.'));
+    if (balance == null || balance < 0) {
+      return 'Početno stanje mora biti broj ≥ 0.';
+    }
+    return null;
+  }
+
+  Map<String, dynamic> _body() {
+    final expiry = DateTime.parse(_expiry.text);
+    return {
+      'cardNumber': _number.text,
+      'cvc': _cvc.text,
+      'expiryDate': expiry.toUtc().toIso8601String(),
+      'initialBalance': double.parse(_balance.text.replaceAll(',', '.')),
+    };
+  }
+
+  Future<void> _save() async {
+    final err = _localError();
+    if (err != null) {
+      alertBox(context, 'Validacija', err);
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      final provider = context.read<PaymentCardProvider>();
+      if (_isEdit) {
+        await provider.update(widget.card!.id!, _body());
+      } else {
+        await provider.insert(_body());
+      }
+      if (mounted) Navigator.pop(context, 'reload');
+    } on ApiClientException catch (e) {
+      if (mounted) alertBox(context, 'Error', e.message);
+    } on Exception catch (e) {
+      if (mounted) alertBox(context, 'Error', e.toString());
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final txs = _loaded?.transactions ?? widget.card?.transactions ?? [];
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_isEdit ? 'Uredi karticu' : 'Dodaj karticu'),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _number,
+              decoration: const InputDecoration(labelText: 'Broj kartice'),
+              keyboardType: TextInputType.number,
+              maxLength: 12,
+            ),
+            TextField(
+              controller: _cvc,
+              decoration: const InputDecoration(labelText: 'CVC'),
+              keyboardType: TextInputType.number,
+              maxLength: 3,
+            ),
+            TextField(
+              controller: _expiry,
+              decoration: const InputDecoration(
+                labelText: 'Datum isteka (YYYY-MM-DD)',
+              ),
+            ),
+            TextField(
+              controller: _balance,
+              decoration: const InputDecoration(labelText: 'Početno stanje'),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: FilledButton(
+                onPressed: _saving ? null : _save,
+                child: Text(_isEdit ? 'Spremi' : 'Dodaj'),
+              ),
+            ),
+            if (_isEdit) ...[
+              const SizedBox(height: 24),
+              const Text(
+                'Transakcije',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              Expanded(
+                child: txs.isEmpty
+                    ? const Text('Nema transakcija.')
+                    : ListView.builder(
+                        itemCount: txs.length,
+                        itemBuilder: (_, i) {
+                          final t = txs[i];
+                          return ListTile(
+                            title: Text('${t.amount ?? 0}'),
+                            subtitle: Text('${t.date ?? ''}'),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+```
+
+Ako `Column` + `Expanded` pravi overflow, umotaj tijelo u `SingleChildScrollView` i transakcije stavi kao običan `Column` djece bez `Expanded`. Na ispitu važnije da se vidi lista nego da layout bude savršen.
+
+---
+
+## 31.20. DODAJ odabir kartice na korpi
+
+### `order_provider.dart` — proširi `checkout`
+
+Sada šalje samo `items`. Treba i id kartice.
+
+```dart
+Future<Order> checkout(
+  List<Map<String, dynamic>> items, {
+  required int paymentCardId,
+}) async {
+  final uri = Uri.parse('${BaseProvider.baseUrl}Orders/Checkout');
+  final headers = createHeaders();
+  final body = jsonEncode({
+    'items': items,
+    'paymentCardIBXXXXXXId': paymentCardId,
+  });
+  final response = await http.post(uri, headers: headers, body: body);
+  validateResponse(response);
+  return Order.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+}
+```
+
+JSON key mora biti **camelCase** imena C# propertyja `PaymentCardIBXXXXXXId` → `paymentCardIBXXXXXXId`.
+
+Ako zaboraviš zamijeniti IBXXXXXX, backend neće bindati polje (ostaje 0) i checkout će reći „select a payment card".
+
+### `cart_list_screen.dart`
+
+Import:
+
+```dart
+import 'package:ecommerce_mobile/models/payment_card.dart';
+import 'package:ecommerce_mobile/providers/payment_card_provider.dart';
+```
+
+State:
+
+```dart
+List<PaymentCard> _cards = [];
+int? _selectedCardId;
+```
+
+U `initState` nakon `_cartProvider = ...` pozovi load:
+
+```dart
+_loadCards();
+```
+
+```dart
+Future<void> _loadCards() async {
+  try {
+    final result = await context.read<PaymentCardProvider>().get(
+      filter: {'page': 1, 'pageSize': 50},
+    );
+    setState(() {
+      _cards = result.items ?? [];
+      if (_cards.isNotEmpty) {
+        _selectedCardId = _cards.first.id;
+      }
+    });
+  } on Exception catch (e) {
+    if (mounted) alertBox(context, 'Cards', e.toString());
+  }
+}
+```
+
+U `_checkout()`, prije `setState(() => _checkoutBusy = true)`:
+
+```dart
+if (_selectedCardId == null) {
+  alertBox(context, 'Payment', 'Odaberite karticu ili je dodajte u profilu.');
+  return;
+}
+```
+
+Poziv checkouta zamijeni sa:
+
+```dart
+final order = await context.read<OrderProvider>().checkout(
+  payload,
+  paymentCardId: _selectedCardId!,
+);
+```
+
+U `_buildFooter`, iznad `FilledButton` Place order:
+
+```dart
+if (_cards.isEmpty)
+  const Padding(
+    padding: EdgeInsets.only(bottom: 8),
+    child: Text('Dodajte karticu u profilu prije plaćanja.'),
+  )
+else
+  Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: DropdownButtonFormField<int>(
+      value: _selectedCardId,
+      decoration: const InputDecoration(labelText: 'Platna kartica'),
+      items: _cards
+          .map(
+            (c) => DropdownMenuItem(
+              value: c.id,
+              child: Text(
+                '${c.cardNumber}  (dostupno: ${c.availableBalance ?? c.initialBalance})',
+              ),
+            ),
+          )
+          .toList(),
+      onChanged: (v) => setState(() => _selectedCardId = v),
+    ),
+  ),
+```
+
+Ako `DropdownButtonFormField.value` bude deprecated u tvojoj Flutter verziji, koristi `initialValue` kako IDE predloži. Bitno je `onChanged` i `items`.
+
+---
+
+## 31.21. Redoslijed kucanja (skraćeno)
+
+1. Connection string + `Update-Database`
+2. Entity + User collection + Order FK + Configuration + DbSet
+3. Build → `Add-Migration` → `Update-Database`
+4. 4 DTO fajla + 2 validatora
+5. Interface + Service
+6. `Program.cs` 3 linije
+7. Controller
+8. `CheckoutRequest` + blok u `CheckoutAsync`
+9. Swagger: login, POST kartice, GET, checkout
+10. Flutter: model → build_runner → provider → main → profil → details → korpa
+
+Ako kompajler javi grešku, čitaj **prvi** error. Najčešće: nisi zamijenila `IBXXXXXX`, fali `using`, fali `ApplyFilters`, fali `AddScoped`.
+
+---
+
+## 31.22. Mini „šta kucam" za postojeći Category — da vidiš analogiju
+
+Kad zapneš, otvori ovo i usporedi sa svojim imenima.
+
+**Interface:**
+
+```csharp
+public interface ICategoryService
+    : IBaseCRUDService<CategoryResponse, CategorySearchObject, CategoriesInsertRequest, CategoriesUpdateRequest>
+{ }
+```
+
+**Servis nasljeđivanje (jedna linija):**
+
+```csharp
+public class CategoryService
+    : BaseCRUDService<Category, CategoryResponse, CategorySearchObject, CategoriesInsertRequest, CategoriesUpdateRequest>,
+      ICategoryService
+```
+
+**Konstruktor servisa:**
+
+```csharp
+public CategoryService(
+    ECommerceDbContext dbContext,
+    MapsterMapper.IMapper mapper,
+    IValidator<CategoriesInsertRequest> insertValidator,
+    IValidator<CategoriesUpdateRequest> updateValidator)
+    : base(dbContext, mapper, insertValidator, updateValidator)
+{ }
+```
+
+**Kontroler nasljeđivanje:**
+
+```csharp
+public class CategoriesController
+    : BaseCRUDController<CategoryResponse, CategorySearchObject, CategoriesInsertRequest, CategoriesUpdateRequest, ICategoryService>
+```
+
+Tvoja kartica je ista slika, 5 generičkih parametara, druga imena.
+
+---
+
+## 31.23. Šta NE kucaš
+
+```csharp
+var db = new ECommerceDbContext(...); // ZABRANJENO u kontroleru
+```
+
+```csharp
+public decimal CurrentBalance { get; set; } // ZABRANJENO zadatkom
+```
+
+```csharp
+card.InitialBalance -= total; // POGREŠNO — stanje se računa
+```
+
+```
+Commands/CreatePaymentCard/  // TO JE RS1, NE RSII
+```
 
 ---
 
